@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nova AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #07090f;
+      --surface:  #0d1117;
+      --glass:    rgba(255,255,255,0.04);
+      --border:   rgba(255,255,255,0.08);
+      --accent:   #00d8ff;
+      --accent2:  #7c3aed;
+      --success:  #10b981;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif; overflow: hidden; }
+
+    /* ── Layout ── */
+    .shell { display: grid; grid-template-columns: 210px 1fr; height: 100vh; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 20px 14px; gap: 6px; overflow-y: auto;
+    }
+
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 10px 18px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 6px;
+    }
+    .logo-orb {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      background: conic-gradient(from 0deg, var(--accent), var(--accent2), var(--accent));
+      animation: spin 4s linear infinite;
+    }
+    .logo-text { font-size: 17px; font-weight: 800; letter-spacing: 2px; }
+
+    .nav-item {
+      display: flex; align-items: center; gap: 9px;
+      padding: 9px 12px; border-radius: 9px; cursor: pointer;
+      font-size: 12px; font-weight: 600; letter-spacing: 0.5px;
+      color: var(--muted); transition: all 0.2s;
+    }
+    .nav-item:hover { background: var(--glass); color: var(--text); }
+    .nav-item.active { background: rgba(0,216,255,0.08); color: var(--accent); border: 1px solid rgba(0,216,255,0.15); }
+    .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+    .sidebar-footer {
+      margin-top: auto; padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 11px; color: var(--muted);
+      text-align: center; font-family: 'DM Mono', monospace;
+    }
+    .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); margin-right: 5px; }
+    .dot.on { background: var(--success); animation: pulse-dot 2s infinite; }
+
+    /* ── Main ── */
+    .main { display: flex; flex-direction: column; overflow: hidden; }
+
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 26px; border-bottom: 1px solid var(--border);
+      background: rgba(7,9,15,0.85); backdrop-filter: blur(10px);
+      flex-shrink: 0; z-index: 10;
+    }
+    .topbar-title { font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+    .topbar-actions { display: flex; gap: 8px; }
+
+    .btn {
+      padding: 6px 14px; border-radius: 7px;
+      border: 1px solid var(--border); background: var(--glass);
+      color: var(--text); font-family: 'Syne', sans-serif;
+      font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.red:hover { border-color: #ef4444; color: #ef4444; }
+
+    /* ── Orb ── */
+    .orb-section {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 28px 20px 16px; flex-shrink: 0;
+    }
+
+    .orb-wrap { position: relative; width: 110px; height: 110px; margin-bottom: 16px; }
+
+    .ring {
+      position: absolute; border-radius: 50%;
+      border: 1.5px solid var(--accent); opacity: 0;
+      animation: ripple 3s ease-out infinite;
+    }
+    .ring:nth-child(1) { inset: -10px; animation-delay: 0s; }
+    .ring:nth-child(2) { inset: -22px; animation-delay: 0.9s; }
+    .ring:nth-child(3) { inset: -36px; animation-delay: 1.8s; }
+    .ring.fast { animation: ripple-fast 0.7s ease-out infinite; }
+
+    .orb {
+      width: 110px; height: 110px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, rgba(0,216,255,0.5), rgba(124,58,237,0.65) 60%, rgba(0,216,255,0.1));
+      box-shadow: 0 0 36px rgba(0,216,255,0.25), 0 0 70px rgba(124,58,237,0.15), inset 0 0 28px rgba(255,255,255,0.04);
+      position: relative; z-index: 1; cursor: pointer; transition: transform 0.2s;
+    }
+    .orb:hover { transform: scale(1.04); }
+    .orb.listening { animation: breathe 0.8s ease-in-out infinite; box-shadow: 0 0 55px rgba(0,216,255,0.55), inset 0 0 36px rgba(255,255,255,0.08); }
+    .orb.processing { animation: hue-spin 1.2s linear infinite; }
+
+    .viz { display: flex; align-items: center; gap: 3px; height: 28px; opacity: 0; transition: opacity 0.3s; }
+    .viz.on { opacity: 1; }
+    .bar { width: 3px; background: var(--accent); border-radius: 2px; min-height: 3px; animation: bar 0.5s ease-in-out infinite alternate; }
+    .bar:nth-child(1){--h:12px;animation-delay:0.00s}
+    .bar:nth-child(2){--h:20px;animation-delay:0.08s}
+    .bar:nth-child(3){--h:26px;animation-delay:0.16s}
+    .bar:nth-child(4){--h:16px;animation-delay:0.04s}
+    .bar:nth-child(5){--h:28px;animation-delay:0.12s}
+    .bar:nth-child(6){--h:18px;animation-delay:0.20s}
+    .bar:nth-child(7){--h:12px;animation-delay:0.08s}
+
+    .orb-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 3px;
+      text-transform: uppercase; color: var(--muted); margin-top: 6px;
+      font-family: 'DM Mono', monospace; transition: color 0.3s;
+    }
+    .orb-label.listening { color: var(--accent); }
+    .orb-label.processing { color: var(--accent2); }
+
+    /* ── Chat ── */
+    .chat {
+      flex: 1; overflow-y: auto; padding: 14px 26px;
+      display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth;
+    }
+    .chat::-webkit-scrollbar { width: 3px; }
+    .chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .empty {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; flex: 1; gap: 10px;
+      color: var(--muted); text-align: center; padding: 40px;
+    }
+    .empty h2 { font-size: 20px; font-weight: 800; color: var(--text); }
+    .empty p  { font-size: 13px; line-height: 1.6; max-width: 300px; }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; margin-top: 6px; }
+    .chip {
+      padding: 6px 13px; border: 1px solid var(--border); border-radius: 999px;
+      font-size: 11px; cursor: pointer; font-family: 'DM Mono', monospace;
+      color: var(--muted); transition: all 0.2s;
+    }
+    .chip:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,216,255,0.04); }
+
+    .msg { display: flex; gap: 10px; animation: slideup 0.25s ease; }
+    .msg.user { flex-direction: row-reverse; }
+
+    .av {
+      width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+    }
+    .av.nova { background: conic-gradient(var(--accent), var(--accent2), var(--accent)); box-shadow: 0 0 10px rgba(0,216,255,0.35); }
+    .av.user { background: var(--surface); border: 1px solid var(--border); }
+
+    .bubble {
+      max-width: 62%; padding: 11px 15px; border-radius: 13px;
+      font-size: 13px; line-height: 1.65; font-family: 'DM Mono', monospace; font-weight: 300;
+    }
+    .msg.user .bubble {
+      background: rgba(0,216,255,0.07); border: 1px solid rgba(0,216,255,0.18);
+      border-radius: 13px 4px 13px 13px; color: var(--accent);
+    }
+    .msg.nova .bubble {
+      background: var(--glass); border: 1px solid var(--border);
+      border-radius: 4px 13px 13px 13px;
+    }
+    .tag {
+      display: inline-block; font-size: 9px; padding: 2px 7px;
+      border-radius: 999px; background: rgba(124,58,237,0.12);
+      border: 1px solid rgba(124,58,237,0.28); color: #a78bfa;
+      margin-bottom: 7px; letter-spacing: 1px; text-transform: uppercase;
+    }
+    .typing { display: flex; align-items: center; gap: 4px; padding: 12px 15px; }
+    .td { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1s ease-in-out infinite; }
+    .td:nth-child(2){animation-delay:.2s} .td:nth-child(3){animation-delay:.4s}
+
+    /* ── Input bar ── */
+    .inputbar {
+      padding: 14px 26px; border-top: 1px solid var(--border);
+      display: flex; gap: 8px; align-items: flex-end;
+      background: rgba(7,9,15,0.9); backdrop-filter: blur(10px); flex-shrink: 0;
+    }
+
+    textarea {
+      flex: 1; background: var(--glass); border: 1px solid var(--border);
+      border-radius: 11px; padding: 11px 14px; color: var(--text);
+      font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 300;
+      outline: none; resize: none; min-height: 42px; max-height: 110px;
+      transition: border-color 0.2s; line-height: 1.5;
+    }
+    textarea::placeholder { color: var(--muted); }
+    textarea:focus { border-color: rgba(0,216,255,0.35); }
+
+    .icon-btn {
+      width: 42px; height: 42px; border-radius: 11px;
+      border: 1px solid var(--border); background: var(--glass);
+      color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .icon-btn.recording { background: rgba(0,216,255,0.09); border-color: var(--accent); color: var(--accent); animation: pulse-btn 0.8s infinite; }
+    .icon-btn svg { width: 17px; height: 17px; }
+
+    .send-btn {
+      width: 42px; height: 42px; border-radius: 11px; border: none;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #000; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; flex-shrink: 0; transition: opacity 0.2s, transform 0.1s;
+    }
+    .send-btn:hover { opacity: 0.88; transform: scale(1.04); }
+    .send-btn svg { width: 17px; height: 17px; }
+
+    /* ── PDF Panel ── */
+    .pdf-panel {
+      flex: 1; overflow-y: auto; padding: 24px 26px;
+      display: flex; flex-direction: column; gap: 18px;
+    }
+    .pdf-panel::-webkit-scrollbar { width: 3px; }
+    .pdf-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .pdf-drop {
+      border: 2px dashed var(--border); border-radius: 14px;
+      padding: 40px 20px; text-align: center; cursor: pointer;
+      transition: all 0.25s; background: var(--glass);
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+    }
+    .pdf-drop:hover, .pdf-drop.drag-over {
+      border-color: var(--accent); background: rgba(0,216,255,0.04);
+    }
+    .pdf-drop svg { width: 40px; height: 40px; color: var(--muted); transition: color 0.2s; }
+    .pdf-drop:hover svg, .pdf-drop.drag-over svg { color: var(--accent); }
+    .pdf-drop h3 { font-size: 14px; font-weight: 700; color: var(--text); }
+    .pdf-drop p  { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+    .pdf-loaded {
+      background: rgba(0,216,255,0.05); border: 1px solid rgba(0,216,255,0.2);
+      border-radius: 12px; padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .pdf-loaded svg { width: 28px; height: 28px; color: var(--accent); flex-shrink: 0; }
+    .pdf-loaded-info { flex: 1; }
+    .pdf-loaded-name { font-size: 13px; font-weight: 700; color: var(--text); }
+    .pdf-loaded-meta { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 2px; }
+    .pdf-clear { background: none; border: none; cursor: pointer; color: var(--muted); padding: 4px; transition: color 0.2s; }
+    .pdf-clear:hover { color: #ef4444; }
+    .pdf-clear svg { width: 16px; height: 16px; }
+
+    .pdf-modes {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    }
+    .mode-btn {
+      padding: 10px 8px; border-radius: 10px; border: 1px solid var(--border);
+      background: var(--glass); color: var(--muted); cursor: pointer;
+      font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
+      text-align: center; transition: all 0.2s; letter-spacing: 0.5px;
+    }
+    .mode-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .mode-btn.active { background: rgba(0,216,255,0.08); border-color: var(--accent); color: var(--accent); }
+    .mode-btn .mode-icon { font-size: 18px; display: block; margin-bottom: 4px; }
+
+    .qa-row {
+      display: flex; gap: 8px; align-items: flex-end;
+    }
+    .qa-row textarea {
+      flex: 1; min-height: 42px; max-height: 90px;
+    }
+
+    .pdf-result {
+      background: var(--glass); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px;
+      font-family: 'DM Mono', monospace; font-size: 12.5px;
+      line-height: 1.75; color: var(--text); white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .pdf-result-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .pdf-result-title { font-size: 11px; font-weight: 700; color: var(--accent); letter-spacing: 1px; text-transform: uppercase; }
+    .copy-btn {
+      padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--glass); color: var(--muted); cursor: pointer;
+      font-size: 10px; font-family: 'Syne', sans-serif; transition: all 0.2s;
+    }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .pdf-processing {
+      display: flex; align-items: center; gap: 12px; padding: 16px;
+      background: var(--glass); border: 1px solid var(--border); border-radius: 12px;
+      font-size: 13px; color: var(--muted); font-family: 'DM Mono', monospace;
+    }
+    .spin { animation: spin 1s linear infinite; width: 18px; height: 18px; flex-shrink: 0; }
+
+    /* ── Animations ── */
+    @keyframes spin       { to { transform: rotate(360deg); } }
+    @keyframes ripple     { 0%{opacity:.55;transform:scale(.95)} 100%{opacity:0;transform:scale(1.45)} }
+    @keyframes ripple-fast{ 0%{opacity:.8;transform:scale(.9)}  100%{opacity:0;transform:scale(1.3)} }
+    @keyframes breathe    { 0%,100%{transform:scale(1)} 50%{transform:scale(1.07)} }
+    @keyframes hue-spin   { 0%{filter:hue-rotate(0deg)} 100%{filter:hue-rotate(360deg)} }
+    @keyframes bar        { from{height:3px} to{height:var(--h,18px)} }
+    @keyframes slideup    { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes blink      { 0%,100%{opacity:.25} 50%{opacity:1} }
+    @keyframes pulse-dot  { 0%,100%{opacity:1} 50%{opacity:.35} }
+    @keyframes pulse-btn  { 0%,100%{box-shadow:0 0 0 0 rgba(0,216,255,.4)} 50%{box-shadow:0 0 0 5px rgba(0,216,255,0)} }
+  </style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-orb"></div>
+      <span class="logo-text">NOVA</span>
+    </div>
+    <div class="nav-item active" onclick="setNav(this, 'assistant')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+      Assistant
+    </div>
+    <div class="nav-item" onclick="setNav(this, 'history')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      History
+    </div>
+    <div class="nav-item" onclick="setNav(this, 'pdf')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+      PDF
+    </div>
+    <div class="nav-item" onclick="setNav(this, 'settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 0-14.14 0m14.14 14.14a10 10 0 0 1-14.14 0"/></svg>
+      Settings
+    </div>
+    <div class="sidebar-footer">
+      <span class="dot" id="dot"></span>
+      <span id="connLabel">Connecting...</span>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <span class="topbar-title">Voice &amp; Text Interface</span>
+      <div class="topbar-actions">
+        <button class="btn red" onclick="clearChat()">Clear</button>
+      </div>
+    </div>
+
+    <!-- Orb -->
+    <div class="orb-section">
+      <div class="orb-wrap">
+        <div class="ring"></div><div class="ring"></div><div class="ring"></div>
+        <div class="orb" id="orb" onclick="toggleMic()"></div>
+      </div>
+      <div class="viz" id="viz">
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div>
+      </div>
+      <div class="orb-label" id="orbLabel">Click orb or type below</div>
+    </div>
+
+    <!-- Chat -->
+    <div class="chat" id="chat">
+      <div class="empty" id="empty">
+        <h2>Hello, I'm Nova ✦</h2>
+        <p>Your AI desktop assistant. Ask anything or try a command:</p>
+        <div class="chips">
+          <div class="chip" onclick="send('Open Chrome')">Open Chrome</div>
+          <div class="chip" onclick="send('Take a screenshot')">Screenshot</div>
+          <div class="chip" onclick="send('Write a Python hello world')">Write Python</div>
+          <div class="chip" onclick="send('What can you do?')">What can you do?</div>
+          <div class="chip" onclick="send('Volume up')">Volume up</div>
+          <div class="chip" onclick="send('Search for resume.pdf')">Find a file</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input bar -->
+    <div class="inputbar">
+      <button class="icon-btn" id="micBtn" onclick="toggleMic()" title="Voice input">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </button>
+      <textarea id="inp" placeholder="Ask Nova anything..." rows="1"
+        onkeydown="onKey(event)" oninput="resize(this)"></textarea>
+      <button class="send-btn" onclick="sendInput()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+    <!-- PDF Panel (hidden by default) -->
+    <div class="pdf-panel" id="pdfPanel" style="display:none">
+
+      <!-- Drop zone -->
+      <div class="pdf-drop" id="pdfDrop"
+           onclick="document.getElementById('pdfFileInput').click()"
+           ondragover="pdfDragOver(event)" ondragleave="pdfDragLeave(event)" ondrop="pdfDrop(event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="12" x2="12" y2="18"/>
+          <line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+        <h3>Drop a PDF here or click to browse</h3>
+        <p>Supports text-based PDFs up to ~50 pages</p>
+        <input type="file" id="pdfFileInput" accept=".pdf" style="display:none" onchange="pdfFileSelected(event)"/>
+      </div>
+
+      <!-- Loaded file info (hidden until file chosen) -->
+      <div class="pdf-loaded" id="pdfLoaded" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        <div class="pdf-loaded-info">
+          <div class="pdf-loaded-name" id="pdfFileName">document.pdf</div>
+          <div class="pdf-loaded-meta" id="pdfFileMeta">Ready to analyse</div>
+        </div>
+        <button class="pdf-clear" onclick="pdfClear()" title="Remove file">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- Mode selector -->
+      <div class="pdf-modes" id="pdfModes" style="display:none">
+        <button class="mode-btn active" id="modeSum" onclick="setPdfMode('summary')">
+          <span class="mode-icon">📄</span>Summary
+        </button>
+        <button class="mode-btn" id="modeKey" onclick="setPdfMode('keypoints')">
+          <span class="mode-icon">🔑</span>Key Points
+        </button>
+        <button class="mode-btn" id="modeQA" onclick="setPdfMode('qa')">
+          <span class="mode-icon">💬</span>Ask a Question
+        </button>
+      </div>
+
+      <!-- QA input (visible only in qa mode) -->
+      <div class="qa-row" id="qaRow" style="display:none">
+        <textarea id="pdfQuestion" placeholder="Ask anything about this PDF…"
+          rows="1" oninput="resize(this)" onkeydown="pdfQAKey(event)"></textarea>
+        <button class="send-btn" onclick="runPdf()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Analyse button (visible in summary/keypoints mode) -->
+      <button class="btn" id="pdfRunBtn" style="display:none; width:100%; padding:11px; font-size:13px; border-color:var(--accent); color:var(--accent);"
+        onclick="runPdf()">✦ Analyse PDF</button>
+
+      <!-- Processing indicator -->
+      <div class="pdf-processing" id="pdfProcessing" style="display:none">
+        <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+          <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+        </svg>
+        <span id="pdfProcessingMsg">Reading PDF…</span>
+      </div>
+
+      <!-- Result -->
+      <div id="pdfResultWrap" style="display:none">
+        <div class="pdf-result-header">
+          <span class="pdf-result-title" id="pdfResultTitle">Summary</span>
+          <button class="copy-btn" onclick="copyResult()">Copy</button>
+        </div>
+        <div class="pdf-result" id="pdfResult"></div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // ── Config ──────────────────────────────────────────────────────────────────
+  // Falls back to 127.0.0.1 when opened as file:// (hostname is empty)
+  const HOST    = window.location.hostname || '127.0.0.1';
+  const API     = `http://${HOST}:8000`;
+  const WS_URL  = `ws://${HOST}:8000/ws`;
+  const SESSION = 'nova_' + Math.random().toString(36).slice(2, 9);
+
+  let ws            = null;
+  let recorder      = null;
+  let audioChunks   = [];
+  let isRecording   = false;
+  let busy          = false;
+
+  // ── WebSocket ────────────────────────────────────────────────────────────────
+  function connectWS() {
+    ws = new WebSocket(`${WS_URL}/${SESSION}`);
+    ws.onopen  = () => setConn(true);
+    ws.onclose = () => {
+      setConn(false);
+      if (busy) {
+        removeTyping();
+        addMsg('nova', '⚠️ Connection lost mid-request. Please try again.');
+        setOrb('idle');
+        busy = false;
+      }
+      setTimeout(connectWS, 3000);
+    };
+    ws.onerror = () => setConn(false);
+    ws.onmessage = e => {
+      const d = JSON.parse(e.data);
+      if (d.type === 'response') onResponse(d);
+      else if (d.type !== 'pong') {
+        // Unknown message type — unblock UI to avoid permanent lock
+        removeTyping();
+        setOrb('idle');
+        busy = false;
+      }
+    };
+  }
+
+  function setConn(on) {
+    document.getElementById('dot').className       = 'dot' + (on ? ' on' : '');
+    document.getElementById('connLabel').textContent = on ? 'Connected' : 'Offline';
+  }
+
+  // ── Orb state ────────────────────────────────────────────────────────────────
+  function setOrb(state) { // 'idle' | 'listening' | 'processing'
+    const orb   = document.getElementById('orb');
+    const label = document.getElementById('orbLabel');
+    const viz   = document.getElementById('viz');
+    const rings = document.querySelectorAll('.ring');
+
+    orb.className   = 'orb'      + (state !== 'idle' ? ' ' + state : '');
+    label.className = 'orb-label'+ (state !== 'idle' ? ' ' + state : '');
+    viz.className   = 'viz'      + (state === 'listening' ? ' on' : '');
+    rings.forEach(r => r.className = 'ring' + (state === 'listening' ? ' fast' : ''));
+
+    label.textContent = { idle: 'Click orb or type below', listening: 'Listening...', processing: 'Processing...' }[state];
+  }
+
+  // ── Chat helpers ─────────────────────────────────────────────────────────────
+  function hideEmpty() {
+    const el = document.getElementById('empty');
+    if (el) el.remove();
+  }
+
+  function addMsg(role, text, intent) {
+    hideEmpty();
+    const chat = document.getElementById('chat');
+
+    const wrap   = Object.assign(document.createElement('div'), { className: `msg ${role}` });
+    const av     = Object.assign(document.createElement('div'), { className: `av ${role}`, textContent: role === 'nova' ? '✦' : 'U' });
+    const bubble = Object.assign(document.createElement('div'), { className: 'bubble' });
+
+    if (intent && role === 'nova') {
+      bubble.appendChild(Object.assign(document.createElement('div'), { className: 'tag', textContent: intent.replace(/_/g,' ') }));
+      bubble.appendChild(document.createElement('br'));
+    }
+    bubble.appendChild(document.createTextNode(text));
+    wrap.appendChild(av);
+    wrap.appendChild(bubble);
+    chat.appendChild(wrap);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function addTyping() {
+    hideEmpty();
+    const chat = document.getElementById('chat');
+    const wrap = Object.assign(document.createElement('div'), { className: 'msg nova', id: 'typing' });
+    wrap.innerHTML = `<div class="av nova">✦</div><div class="bubble"><div class="typing"><div class="td"></div><div class="td"></div><div class="td"></div></div></div>`;
+    chat.appendChild(wrap);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function removeTyping() {
+    document.getElementById('typing')?.remove();
+  }
+
+  // ── Send text ────────────────────────────────────────────────────────────────
+  async function send(text) {
+    if (!text.trim() || busy) return;
+    busy = true;
+    addMsg('user', text);
+    addTyping();
+    setOrb('processing');
+
+    try {
+      if (ws?.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(JSON.stringify({ type: 'text', text }));
+        } catch {
+          // WS send failed — fall back to HTTP
+          const res  = await fetch(`${API}/api/command/text`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, session_id: SESSION }),
+          });
+          onResponse(await res.json());
+        }
+      } else {
+        const res  = await fetch(`${API}/api/command/text`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, session_id: SESSION }),
+        });
+        onResponse(await res.json());
+      }
+    } catch {
+      removeTyping();
+      addMsg('nova', '⚠️ Cannot reach Nova backend. Make sure the server is running:\n  uvicorn main:app --port 8000 --reload\n(Run this from inside the backend/ folder)');
+      setOrb('idle');
+      busy = false;
+    }
+  }
+
+  function onResponse(d) {
+    removeTyping();
+    addMsg('nova', d.reply, d.intent);
+    setOrb('idle');
+    busy = false;
+    if (d.audio_b64) playAudio(d.audio_b64);
+  }
+
+  function playAudio(b64) {
+    try {
+      const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+      const url   = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
+      const a     = new Audio(url);
+      a.onended   = () => URL.revokeObjectURL(url);
+      a.play().catch(() => {});
+    } catch {}
+  }
+
+  // ── Voice recording ──────────────────────────────────────────────────────────
+  async function toggleMic() {
+    isRecording ? stopRec() : await startRec();
+  }
+
+  async function startRec() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      alert('Your browser does not support microphone access. Use Chrome or Edge.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Pick best supported MIME type (Groq Whisper accepts all of these)
+      const mimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/ogg',
+        'audio/mp4',
+      ];
+      const mimeType = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || '';
+
+      recorder    = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      audioChunks = [];
+      recorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        if (audioChunks.length === 0) {
+          addMsg('nova', '⚠️ No audio captured. Please try again.');
+          setOrb('idle');
+          busy = false;
+          return;
+        }
+        const blob = new Blob(audioChunks, { type: mimeType || 'audio/webm' });
+        const b64  = (await blobToB64(blob)).split(',')[1];
+
+        addMsg('user', '🎙️ [Voice message]');
+        addTyping();
+        setOrb('processing');
+        busy = true;
+
+        try {
+          const res = await fetch(`${API}/api/command/audio`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ audio_b64: b64, session_id: SESSION }),
+          });
+          const d = await res.json();
+          if (d.transcript) {
+            const bubbles = document.querySelectorAll('.msg.user .bubble');
+            const last    = bubbles[bubbles.length - 1];
+            if (last?.textContent.includes('[Voice message]')) last.textContent = d.transcript;
+          }
+          onResponse(d);
+        } catch {
+          removeTyping();
+          addMsg('nova', '⚠️ Voice processing failed. Check backend is running.');
+          setOrb('idle');
+          busy = false;
+        }
+      };
+      recorder.start(250); // collect data every 250ms for reliability
+      isRecording = true;
+      setOrb('listening');
+      document.getElementById('micBtn').classList.add('recording');
+    } catch (err) {
+      if (err.name === 'NotAllowedError') {
+        alert('Microphone access denied. Click the 🔒 icon in your browser address bar and allow microphone access, then refresh.');
+      } else if (err.name === 'NotFoundError') {
+        alert('No microphone found. Please connect a microphone and try again.');
+      } else {
+        alert('Microphone error: ' + err.message);
+      }
+    }
+  }
+
+  function stopRec() {
+    recorder?.state !== 'inactive' && recorder.stop();
+    isRecording = false;
+    document.getElementById('micBtn').classList.remove('recording');
+  }
+
+  const blobToB64 = b => new Promise(r => { const fr = new FileReader(); fr.onloadend = () => r(fr.result); fr.readAsDataURL(b); });
+
+  // ── Input helpers ────────────────────────────────────────────────────────────
+  function sendInput() {
+    const el = document.getElementById('inp');
+    const t  = el.value.trim();
+    if (!t) return;
+    el.value = '';
+    resize(el);
+    send(t);
+  }
+
+  function onKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendInput(); }
+  }
+
+  function resize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 110) + 'px';
+  }
+
+  function clearChat() {
+    removeTyping();
+    setOrb('idle');
+    busy = false;
+    if (isRecording) stopRec();
+    document.getElementById('chat').innerHTML = `
+      <div class="empty" id="empty">
+        <h2>Hello, I'm Nova ✦</h2>
+        <p>Your AI desktop assistant. Ask anything or try a command:</p>
+        <div class="chips">
+          <div class="chip" onclick="send('Open Chrome')">Open Chrome</div>
+          <div class="chip" onclick="send('Take a screenshot')">Screenshot</div>
+          <div class="chip" onclick="send('Write a Python hello world')">Write Python</div>
+          <div class="chip" onclick="send('What can you do?')">What can you do?</div>
+          <div class="chip" onclick="send('Volume up')">Volume up</div>
+          <div class="chip" onclick="send('Search for resume.pdf')">Find a file</div>
+        </div>
+      </div>`;
+    fetch(`${API}/api/history/${SESSION}`, { method: 'DELETE' }).catch(() => {});
+  }
+
+  // ── Nav ──────────────────────────────────────────────────────────────────────
+  function setNav(el, view) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+
+    // Show/hide panels
+    const chatEl    = document.getElementById('chat');
+    const inputBar  = document.querySelector('.inputbar');
+    const orbSec    = document.querySelector('.orb-section');
+    const pdfPanelEl = document.getElementById('pdfPanel');
+
+    const isChat = (view === 'assistant');
+    chatEl.style.display    = isChat ? 'flex'  : 'none';
+    inputBar.style.display  = isChat ? 'flex'  : 'none';
+    orbSec.style.display    = isChat ? 'flex'  : 'none';
+    pdfPanelEl.style.display = (view === 'pdf') ? 'flex' : 'none';
+
+    if (view === 'history') {
+      chatEl.style.display = 'flex';
+      fetch(`${API}/api/history/${SESSION}`)
+        .then(r => r.json())
+        .then(data => {
+          chatEl.innerHTML = '';
+          if (!data.history?.length) {
+            chatEl.innerHTML = '<div class="empty"><h2>No history yet</h2><p>Start a conversation first.</p></div>';
+            return;
+          }
+          data.history.forEach(t => { addMsg('user', t.user); addMsg('nova', t.assistant); });
+        })
+        .catch(() => addMsg('nova', '⚠️ Could not load history.'));
+    } else if (view === 'settings') {
+      chatEl.style.display = 'flex';
+      chatEl.innerHTML = `
+        <div class="empty">
+          <h2>Settings</h2>
+          <p style="margin-bottom:12px">Backend: <code style="color:var(--accent)">${API}</code></p>
+          <p style="margin-bottom:12px">Session ID: <code style="color:var(--accent)">${SESSION}</code></p>
+          <div class="chips">
+            <div class="chip" onclick="fetch('${API}/health').then(r=>r.json()).then(d=>alert(JSON.stringify(d,null,2)))">Check Health</div>
+          </div>
+        </div>`;
+    }
+  }
+
+  // ── PDF Logic ────────────────────────────────────────────────────────────────
+  let pdfB64     = null;
+  let pdfName    = '';
+  let pdfMode    = 'summary';
+
+  function pdfDragOver(e) {
+    e.preventDefault();
+    document.getElementById('pdfDrop').classList.add('drag-over');
+  }
+  function pdfDragLeave(e) {
+    document.getElementById('pdfDrop').classList.remove('drag-over');
+  }
+  function pdfDrop(e) {
+    e.preventDefault();
+    document.getElementById('pdfDrop').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) loadPdfFile(file);
+  }
+  function pdfFileSelected(e) {
+    const file = e.target.files[0];
+    if (file) loadPdfFile(file);
+  }
+
+  function loadPdfFile(file) {
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Please upload a PDF file.');
+      return;
+    }
+    pdfName = file.name;
+    const reader = new FileReader();
+    reader.onload = () => {
+      pdfB64 = reader.result.split(',')[1];
+      const kb = (file.size / 1024).toFixed(1);
+      document.getElementById('pdfFileName').textContent = file.name;
+      document.getElementById('pdfFileMeta').textContent = `${kb} KB — ready to analyse`;
+      document.getElementById('pdfDrop').style.display   = 'none';
+      document.getElementById('pdfLoaded').style.display = 'flex';
+      document.getElementById('pdfModes').style.display  = 'grid';
+      setPdfMode(pdfMode);
+      // Clear previous result
+      document.getElementById('pdfResultWrap').style.display = 'none';
+      document.getElementById('pdfProcessing').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function pdfClear() {
+    pdfB64  = null;
+    pdfName = '';
+    document.getElementById('pdfDrop').style.display      = 'flex';
+    document.getElementById('pdfLoaded').style.display    = 'none';
+    document.getElementById('pdfModes').style.display     = 'none';
+    document.getElementById('qaRow').style.display        = 'none';
+    document.getElementById('pdfRunBtn').style.display    = 'none';
+    document.getElementById('pdfResultWrap').style.display= 'none';
+    document.getElementById('pdfProcessing').style.display= 'none';
+    document.getElementById('pdfFileInput').value         = '';
+  }
+
+  function setPdfMode(mode) {
+    pdfMode = mode;
+    ['modeSum','modeKey','modeQA'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById(mode === 'summary' ? 'modeSum' : mode === 'keypoints' ? 'modeKey' : 'modeQA').classList.add('active');
+    document.getElementById('qaRow').style.display     = mode === 'qa' ? 'flex' : 'none';
+    document.getElementById('pdfRunBtn').style.display = mode !== 'qa' ? 'block' : 'none';
+  }
+
+  function pdfQAKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runPdf(); }
+  }
+
+  async function runPdf() {
+    if (!pdfB64) { alert('Please upload a PDF first.'); return; }
+    const question = document.getElementById('pdfQuestion').value.trim();
+    if (pdfMode === 'qa' && !question) {
+      document.getElementById('pdfQuestion').focus();
+      return;
+    }
+
+    // Show processing
+    document.getElementById('pdfRunBtn').style.display     = 'none';
+    document.getElementById('pdfResultWrap').style.display = 'none';
+    document.getElementById('pdfProcessing').style.display = 'flex';
+    document.getElementById('pdfProcessingMsg').textContent =
+      pdfMode === 'summary'   ? 'Summarising PDF…' :
+      pdfMode === 'keypoints' ? 'Extracting key points…' :
+                                'Finding answer…';
+
+    try {
+      const res = await fetch(`${API}/api/pdf/summarize`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pdf_b64:    pdfB64,
+          filename:   pdfName,
+          mode:       pdfMode,
+          question:   question,
+          session_id: SESSION,
+        }),
+      });
+      const d = await res.json();
+
+      document.getElementById('pdfProcessing').style.display = 'none';
+      document.getElementById('pdfResultWrap').style.display = 'block';
+
+      const titleMap = { pdf_summary: 'Summary', key_points: 'Key Points', pdf_qa: 'Answer' };
+      document.getElementById('pdfResultTitle').textContent = titleMap[d.intent] || 'Result';
+      document.getElementById('pdfResult').textContent      = d.reply;
+
+      if (pdfMode !== 'qa') {
+        document.getElementById('pdfRunBtn').style.display = 'block';
+      }
+      if (d.audio_b64) playAudio(d.audio_b64);
+
+    } catch (err) {
+      document.getElementById('pdfProcessing').style.display = 'none';
+      document.getElementById('pdfResult').textContent       = '⚠️ Failed to process PDF. Make sure the backend is running.';
+      document.getElementById('pdfResultWrap').style.display = 'block';
+      if (pdfMode !== 'qa') document.getElementById('pdfRunBtn').style.display = 'block';
+    }
+  }
+
+  function copyResult() {
+    const text = document.getElementById('pdfResult').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.querySelector('.copy-btn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 1500);
+    }).catch(() => {
+      // Fallback for non-HTTPS
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    });
+  }
+
+  // Safety net: if busy gets stuck for >30s, auto-release
+  setInterval(() => {
+    if (busy) { removeTyping(); setOrb('idle'); busy = false; }
+  }, 30000);
+
+  
+  connectWS();
+
+  fetch(`${API}/health`)
+    .then(r => r.json())
+    .then(d => { if (!d.groq_key_set) addMsg('nova', '⚠️ GROQ API key not set. Add it to your .env file as GROQ_API_KEY=...'); })
+    .catch(() => {});
+</script>
+</body>
+</html>
