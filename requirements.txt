@@ -1,32 +1,15 @@
-# Nova AI Desktop Assistant — Requirements
-# Python 3.10+ compatible
-# Run: pip install -r requirements.txt
-
-# ── Web framework ──────────────────────────────────────────────────────────────
 fastapi[standard]
 uvicorn[standard]
 python-multipart
 python-dotenv
-
-# ── AI / NLU ───────────────────────────────────────────────────────────────────
-groq                        # LLM + Whisper STT (Groq cloud)
-httpx                       # async HTTP client for Groq Whisper API
-
-# ── Speech Recognition (fallback STT) ─────────────────────────────────────────
-SpeechRecognition           # Google STT fallback
-
-# ── Text-to-Speech ─────────────────────────────────────────────────────────────
-pyttsx3                     # Offline TTS (uses Windows SAPI voices)
-
-# ── Desktop Automation ─────────────────────────────────────────────────────────
-pyautogui                   # Volume keys, screenshots, hotkeys
-pyperclip                   # Clipboard read/write
-
-# ── Brightness Control ─────────────────────────────────────────────────────────
-screen-brightness-control   # Laptop screen brightness (optional but recommended)
-
-# ── Core ───────────────────────────────────────────────────────────────────────
+groq
+httpx
+SpeechRecognition
 pydantic
+requests
+websockets
+PyMuPDF
+pypdf
 requests
 websockets
 
