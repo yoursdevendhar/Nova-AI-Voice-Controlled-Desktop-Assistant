@@ -16,10 +16,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from core.nlu import NLUEngine
-from core.conversation import ConversationManager
-from services.tts import TTSService
-from automation.desktop import DesktopAutomation
+from nlu import NLUEngine
+from conversation import ConversationManager
+from tts import TTSService
+from desktop import DesktopAutomation
 
 # ── Load .env ──────────────────────────────────────────────────────────────────
 _env_path = Path(__file__).parent / ".env"
