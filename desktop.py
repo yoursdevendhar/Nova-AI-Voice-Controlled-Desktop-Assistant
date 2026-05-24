@@ -1,5 +1,5 @@
 """
-automation/desktop.py — Windows Desktop Automation
+desktop.py — Windows Desktop Automation
 Handles: open_app, close_app, open_url, screenshot, volume,
          brightness, lock_screen, shutdown, restart,
          search_file, create_folder, clipboard_get, clipboard_set
@@ -7,11 +7,17 @@ Handles: open_app, close_app, open_url, screenshot, volume,
 
 import asyncio
 import os
+import platform
 import subprocess
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
+
+
+# ── Detect if running on a server (not Windows) ───────────────────────────────
+IS_SERVER = platform.system() != "Windows"
+SERVER_MSG = "🖥️ This action only works when Nova runs locally on your Windows PC. AI chat, voice, and PDF features are fully available here!"
 
 
 # ── App name → executable / path map ─────────────────────────────────────────
@@ -79,7 +85,6 @@ APP_MAP: dict[str, list[str]] = {
     "obs":              ["obs64", "obs"],
 }
 
-# WhatsApp executable locations
 WHATSAPP_PATHS = [
     Path(os.environ.get("LOCALAPPDATA", "")) / "WhatsApp" / "WhatsApp.exe",
     Path(os.environ.get("PROGRAMFILES", "")) / "WindowsApps" / "WhatsApp",
@@ -97,10 +102,16 @@ CHROME_PATHS = [
 class DesktopAutomation:
 
     def __init__(self):
-        print("✅ Desktop automation ready")
+        if IS_SERVER:
+            print("⚠️  Desktop automation disabled (server/Linux mode — AI features still work)")
+        else:
+            print("✅ Desktop automation ready")
 
     # ── Main dispatcher ───────────────────────────────────────────────────────
     async def execute(self, action: str, params: dict) -> dict:
+        if IS_SERVER:
+            return {"success": False, "message": SERVER_MSG}
+
         loop = asyncio.get_event_loop()
         try:
             fn = getattr(self, f"_act_{action}", None)
@@ -115,15 +126,12 @@ class DesktopAutomation:
     def _act_open_app(self, params: dict) -> dict:
         app = params.get("app", "").lower().strip()
 
-        # Special case: WhatsApp
         if "whatsapp" in app:
             return self._open_whatsapp()
 
-        # Special case: Chrome
         if app in ("chrome", "google chrome"):
             return self._open_chrome()
 
-        # Try START command (works for UWP apps and most installed apps)
         try:
             subprocess.Popen(["cmd", "/c", "start", "", app],
                              creationflags=subprocess.CREATE_NO_WINDOW)
@@ -131,7 +139,6 @@ class DesktopAutomation:
         except Exception:
             pass
 
-        # Try matching in known map
         exe = self._resolve_app(app)
         if exe:
             try:
@@ -144,13 +151,10 @@ class DesktopAutomation:
         return {"success": False, "message": f"App '{app}' not found. Make sure it's installed."}
 
     def _open_whatsapp(self) -> dict:
-        # 1. Try direct EXE paths
         for p in WHATSAPP_PATHS:
             if Path(p).exists():
                 subprocess.Popen(str(p), creationflags=subprocess.CREATE_NO_WINDOW)
                 return {"success": True, "message": "Opening WhatsApp…"}
-
-        # 2. Try UWP via shell (Windows Store app)
         try:
             subprocess.Popen(
                 ["explorer.exe", "shell:AppsFolder\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App"],
@@ -159,16 +163,12 @@ class DesktopAutomation:
             return {"success": True, "message": "Opening WhatsApp…"}
         except Exception:
             pass
-
-        # 3. Try via start command
         try:
             subprocess.Popen(["cmd", "/c", "start", "whatsapp:"],
                              creationflags=subprocess.CREATE_NO_WINDOW)
             return {"success": True, "message": "Opening WhatsApp…"}
         except Exception:
             pass
-
-        # 4. Fallback: open WhatsApp Web
         import webbrowser
         webbrowser.open("https://web.whatsapp.com")
         return {"success": True, "message": "Opening WhatsApp Web in your browser (desktop app not found)."}
@@ -178,8 +178,6 @@ class DesktopAutomation:
             if Path(str(p)).exists():
                 subprocess.Popen(str(p), creationflags=subprocess.CREATE_NO_WINDOW)
                 return {"success": True, "message": "Opening Chrome…"}
-
-        # Fallback to start command
         try:
             subprocess.Popen(["cmd", "/c", "start", "chrome"],
                              creationflags=subprocess.CREATE_NO_WINDOW)
@@ -197,23 +195,14 @@ class DesktopAutomation:
     def _act_close_app(self, params: dict) -> dict:
         app = params.get("app", "").lower().strip()
         process_map = {
-            "chrome": "chrome.exe",
-            "firefox": "firefox.exe",
-            "edge": "msedge.exe",
-            "whatsapp": "WhatsApp.exe",
-            "telegram": "Telegram.exe",
-            "discord": "Discord.exe",
-            "spotify": "Spotify.exe",
-            "vlc": "vlc.exe",
-            "notepad": "notepad.exe",
-            "word": "WINWORD.EXE",
-            "excel": "EXCEL.EXE",
-            "powerpoint": "POWERPNT.EXE",
-            "teams": "Teams.exe",
-            "zoom": "Zoom.exe",
-            "slack": "slack.exe",
-            "obs": "obs64.exe",
-            "vscode": "Code.exe",
+            "chrome": "chrome.exe", "firefox": "firefox.exe",
+            "edge": "msedge.exe", "whatsapp": "WhatsApp.exe",
+            "telegram": "Telegram.exe", "discord": "Discord.exe",
+            "spotify": "Spotify.exe", "vlc": "vlc.exe",
+            "notepad": "notepad.exe", "word": "WINWORD.EXE",
+            "excel": "EXCEL.EXE", "powerpoint": "POWERPNT.EXE",
+            "teams": "Teams.exe", "zoom": "Zoom.exe",
+            "slack": "slack.exe", "obs": "obs64.exe", "vscode": "Code.exe",
         }
         proc = process_map.get(app, app + ".exe")
         try:
@@ -251,7 +240,6 @@ class DesktopAutomation:
             img.save(str(path))
             return {"success": True, "message": f"Screenshot saved to Desktop as nova_screenshot_{ts}.png"}
         except ImportError:
-            # Fallback: use Windows Snipping Tool shortcut
             import pyautogui
             pyautogui.hotkey("win", "shift", "s")
             return {"success": True, "message": "Snipping tool opened — select an area to capture."}
@@ -262,7 +250,6 @@ class DesktopAutomation:
     def _act_volume(self, params: dict) -> dict:
         direction = params.get("direction", "up")
         amount    = int(params.get("amount", 10))
-
         try:
             import pyautogui
             if direction == "mute":
@@ -271,15 +258,13 @@ class DesktopAutomation:
             elif direction == "up":
                 for _ in range(max(1, amount // 2)):
                     pyautogui.press("volumeup")
-                return {"success": True, "message": f"Volume increased."}
+                return {"success": True, "message": "Volume increased."}
             elif direction == "down":
                 for _ in range(max(1, amount // 2)):
                     pyautogui.press("volumedown")
-                return {"success": True, "message": f"Volume decreased."}
+                return {"success": True, "message": "Volume decreased."}
         except ImportError:
             pass
-
-        # Fallback: nircmd (if installed) or PowerShell
         try:
             if direction == "mute":
                 subprocess.run(
@@ -301,10 +286,6 @@ class DesktopAutomation:
 
     # ── brightness ────────────────────────────────────────────────────────────
     def _act_brightness(self, params: dict) -> dict:
-        """
-        Set or adjust screen brightness on Windows (works on laptops).
-        params: {"level": 0-100} OR {"direction": "up"/"down", "amount": 10}
-        """
         try:
             import screen_brightness_control as sbc
             if "level" in params:
@@ -320,7 +301,6 @@ class DesktopAutomation:
                 sbc.set_brightness(new_val)
                 return {"success": True, "message": f"Brightness {'increased' if direction=='up' else 'decreased'} to {new_val}%."}
         except ImportError:
-            # Fallback: PowerShell WMI
             try:
                 direction = params.get("direction", "up")
                 amount    = int(params.get("amount", 10))
@@ -334,10 +314,9 @@ class DesktopAutomation:
                     ["powershell", "-c", ps],
                     creationflags=subprocess.CREATE_NO_WINDOW, check=True
                 )
-                return {"success": True, "message": f"Brightness adjusted."}
+                return {"success": True, "message": "Brightness adjusted."}
             except Exception as e:
-                return {"success": False,
-                        "message": f"Brightness control failed. Install screen-brightness-control: pip install screen-brightness-control. Error: {e}"}
+                return {"success": False, "message": f"Brightness control failed: {e}"}
         except Exception as e:
             return {"success": False, "message": f"Brightness error: {e}"}
 
@@ -375,13 +354,11 @@ class DesktopAutomation:
         query = params.get("query", "").strip()
         if not query:
             return {"success": False, "message": "No search query provided."}
-
         search_dirs = [
             Path(os.environ.get("USERPROFILE", Path.home())) / "Desktop",
             Path(os.environ.get("USERPROFILE", Path.home())) / "Documents",
             Path(os.environ.get("USERPROFILE", Path.home())) / "Downloads",
         ]
-
         found = []
         for d in search_dirs:
             if d.exists():
@@ -391,13 +368,10 @@ class DesktopAutomation:
                         break
             if len(found) >= 5:
                 break
-
         if found:
             files = "\n".join(found[:5])
-            return {"success": True,
-                    "message": f"Found {len(found)} file(s) matching '{query}':\n{files}"}
-        return {"success": False,
-                "message": f"No files matching '{query}' found in Desktop, Documents, or Downloads."}
+            return {"success": True, "message": f"Found {len(found)} file(s) matching '{query}':\n{files}"}
+        return {"success": False, "message": f"No files matching '{query}' found in Desktop, Documents, or Downloads."}
 
     # ── create_folder ─────────────────────────────────────────────────────────
     def _act_create_folder(self, params: dict) -> dict:
