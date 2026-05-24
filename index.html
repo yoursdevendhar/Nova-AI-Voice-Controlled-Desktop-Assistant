@@ -495,9 +495,10 @@
 <script>
   // ── Config ──────────────────────────────────────────────────────────────────
   // Falls back to 127.0.0.1 when opened as file:// (hostname is empty)
+  const isLocal = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' || window.location.hostname === '';
   const HOST    = window.location.hostname || '127.0.0.1';
-  const API     = `http://${HOST}:8000`;
-  const WS_URL  = `ws://${HOST}:8000/ws`;
+  const API     = isLocal ? `http://${HOST}:8000` : `https://${HOST}`;
+  const WS_URL  = isLocal ? `ws://${HOST}:8000/ws` : `wss://${HOST}/ws`;
   const SESSION = 'nova_' + Math.random().toString(36).slice(2, 9);
 
   let ws            = null;
