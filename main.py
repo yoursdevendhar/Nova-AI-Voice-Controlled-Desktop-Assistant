@@ -38,9 +38,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-FRONTEND_DIR = Path(__file__).parent / "frontend"
-if FRONTEND_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+FRONTEND_DIR = Path(__file__).parent
 
 nlu_engine: NLUEngine                     = None
 conversation_manager: ConversationManager = None
